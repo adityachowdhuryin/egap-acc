@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EGAP Command Plane</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <style>
+        /* ── Reset & Base ──────────────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #111111;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* ── Header ────────────────────────────────────────────────── */
+        header {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border-bottom: 1px solid #39ff1425;
+            padding: 1.25rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        header .logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #39ff14, #00cc66);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1rem;
+            color: #0a0a0a;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #39ff14, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        header .nav-pills {
+            margin-left: auto;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .status-pill {
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .status-pill.live {
+            background: rgba(57, 255, 20, 0.1);
+            color: #39ff14;
+            border: 1px solid rgba(57, 255, 20, 0.2);
+        }
+
+        .status-pill .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.4);
+            }
+
+            50% {
+                opacity: 0.6;
+                box-shadow: 0 0 0 5px rgba(57, 255, 20, 0);
+            }
+        }
+
+        /* ── Split Layout ──────────────────────────────────────────── */
+        .split-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: calc(100vh - 68px);
+        }
+
+        .panel {
+            padding: 1.5rem;
+            overflow-y: auto;
+            max-height: calc(100vh - 68px);
+        }
+
+        .panel-left {
+            border-right: 1px solid #1e1e1e;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #222;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-title .icon {
+            font-size: 1.1rem;
+        }
+
+        .panel-left .panel-title {
+            color: #39ff14;
+        }
+
+        .panel-right .panel-title {
+            color: #ffb830;
+        }
+
+        .count-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.2rem 0.55rem;
+            border-radius: 10px;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .count-badge.green {
+            background: rgba(57, 255, 20, 0.12);
+            color: #39ff14;
+            border: 1px solid rgba(57, 255, 20, 0.25);
+        }
+
+        .count-badge.yellow {
+            background: rgba(255, 184, 48, 0.12);
+            color: #ffb830;
+            border: 1px solid rgba(255, 184, 48, 0.25);
+        }
+
+        /* ── Agent Cards ───────────────────────────────────────────── */
+        .card-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .agent-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-left: 3px solid #39ff14;
+            border-radius: 10px;
+            padding: 1.1rem 1.25rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .agent-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 20px rgba(57, 255, 20, 0.08);
+            border-color: #39ff1450;
+        }
+
+        .agent-card .card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-card .name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .role-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.2rem 0.55rem;
+            border-radius: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            background: rgba(57, 255, 20, 0.1);
+            color: #39ff14;
+            border: 1px solid rgba(57, 255, 20, 0.2);
+        }
+
+        .agent-card .goal {
+            color: #888;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            margin-bottom: 0.75rem;
+        }
+
+        .tools-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+
+        .tool-chip {
+            background: #111;
+            color: #999;
+            font-size: 0.68rem;
+            font-weight: 500;
+            padding: 0.22rem 0.5rem;
+            border-radius: 5px;
+            border: 1px solid #2a2a2a;
+        }
+
+        /* ── Task Tickets ──────────────────────────────────────────── */
+        .task-ticket {
+            background: #1a1a1a;
+            border: 1px solid rgba(255, 184, 48, 0.25);
+            border-left: 3px solid #ffb830;
+            border-radius: 10px;
+            padding: 1.1rem 1.25rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .task-ticket:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 20px rgba(255, 184, 48, 0.08);
+        }
+
+        .task-ticket .ticket-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+        }
+
+        .task-ticket .task-id {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #ffb830;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: rgba(255, 184, 48, 0.08);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .task-ticket .pending-badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: rgba(255, 184, 48, 0.1);
+            color: #ffb830;
+            border: 1px solid rgba(255, 184, 48, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .pending-badge .blink {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #ffb830;
+            animation: pulse-yellow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-yellow {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* ── Zombie / Stuck Badge ────────────────────────────────── */
+        .task-ticket.zombie {
+            border-color: rgba(255, 60, 60, 0.4);
+            border-left-color: #ff4444;
+        }
+
+        .task-ticket.zombie:hover {
+            box-shadow: 0 4px 20px rgba(255, 60, 60, 0.12);
+        }
+
+        .zombie-badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: rgba(255, 60, 60, 0.12);
+            color: #ff4444;
+            border: 1px solid rgba(255, 60, 60, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            animation: zombie-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes zombie-pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .task-ticket .description {
+            color: #ccc;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            margin-bottom: 0.7rem;
+            word-break: break-word;
+        }
+
+        .task-ticket .agent-ref {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.72rem;
+            color: #666;
+        }
+
+        .task-ticket .agent-ref .agent-name {
+            color: #39ff14;
+            font-weight: 600;
+        }
+
+        .task-ticket .time-ago {
+            font-size: 0.65rem;
+            color: #555;
+            margin-top: 0.5rem;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.85rem;
+            padding-top: 0.7rem;
+            border-top: 1px solid #2a2a2a;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 0.45rem 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+        }
+
+        .action-btn.approve {
+            background: rgba(57, 255, 20, 0.1);
+            color: #39ff14;
+            border: 1px solid rgba(57, 255, 20, 0.25);
+        }
+
+        .action-btn.approve:hover {
+            background: rgba(57, 255, 20, 0.2);
+            box-shadow: 0 0 12px rgba(57, 255, 20, 0.15);
+        }
+
+        .action-btn.reject {
+            background: rgba(255, 60, 60, 0.1);
+            color: #ff4444;
+            border: 1px solid rgba(255, 60, 60, 0.25);
+        }
+
+        .action-btn.reject:hover {
+            background: rgba(255, 60, 60, 0.2);
+            box-shadow: 0 0 12px rgba(255, 60, 60, 0.15);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(30px);
+                height: 0;
+                padding: 0;
+                margin: 0;
+                overflow: hidden;
+            }
+        }
+
+        /* ── Loading / Empty / Error States ────────────────────────── */
+        .state-msg {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: #555;
+        }
+
+        .state-msg .icon {
+            font-size: 2rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .state-msg .label {
+            font-size: 0.85rem;
+        }
+
+        .state-msg .hint {
+            font-size: 0.72rem;
+            color: #444;
+            margin-top: 0.4rem;
+        }
+
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #222;
+            border-top-color: #39ff14;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 0.75rem;
+        }
+
+        .spinner.yellow {
+            border-top-color: #ffb830;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Responsive ────────────────────────────────────────── */
+        @media (max-width: 800px) {
+            .split-view {
+                grid-template-columns: 1fr;
+            }
+
+            .panel-left {
+                border-right: none;
+                border-bottom: 1px solid #1e1e1e;
+                max-height: none;
+            }
+
+            .panel-right {
+                max-height: none;
+            }
+
+            .cost-bar {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+        }
+
+        /* ── Cost Accounting Bar ───────────────────────────────── */
+        .cost-bar {
+            background: linear-gradient(135deg, #0d0d1a 0%, #141428 100%);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+            padding: 0.75rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .cost-bar .cost-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #818cf8;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            white-space: nowrap;
+        }
+
+        .cost-stat {
+            display: flex;
+            align-items: baseline;
+            gap: 0.35rem;
+        }
+
+        .cost-stat .value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #c4b5fd;
+        }
+
+        .cost-stat .unit {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #6366f1;
+            text-transform: uppercase;
+        }
+
+        .cost-agents {
+            margin-left: auto;
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .cost-agent-chip {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 14px;
+            background: rgba(99, 102, 241, 0.1);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        /* ── Discovery Status Pill ───────────────────────────── */
+        .status-pill.discovery {
+            background: rgba(99, 102, 241, 0.12);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.25);
+        }
+
+        .status-pill.discovery .dot {
+            background: #818cf8;
+        }
+
+        .status-pill.discovery.error {
+            background: rgba(255, 85, 85, 0.12);
+            color: #ff5555;
+            border-color: rgba(255, 85, 85, 0.25);
+        }
+
+        .status-pill.discovery.error .dot {
+            background: #ff5555;
+        }
+
+        /* ── Deploy Button ──────────────────────────────────── */
+        .deploy-btn {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: #fff;
+            border: none;
+            padding: 0.35rem 1rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+        }
+
+        .deploy-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+        }
+
+        .deploy-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .deploy-btn.deploying {
+            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+        }
+
+        /* ── Trace Map ──────────────────────────────────────────── */
+        .trace-section {
+            margin: 1.5rem 1rem 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.25rem;
+            overflow: hidden;
+        }
+
+        .trace-section .panel-header {
+            margin-bottom: 1rem;
+        }
+
+        .trace-row {
+            display: grid;
+            grid-template-columns: 100px 100px 1fr 60px;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.45rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 0.72rem;
+        }
+
+        .trace-row:last-child {
+            border: none;
+        }
+
+        .trace-id {
+            font-family: monospace;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+        }
+
+        .trace-services {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .svc-tag {
+            padding: 0.15rem 0.4rem;
+            border-radius: 6px;
+            font-size: 0.55rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .svc-tag.ingress {
+            background: #7c3aed22;
+            color: #a78bfa;
+            border: 1px solid #7c3aed44;
+        }
+
+        .svc-tag.orchestrator {
+            background: #2563eb22;
+            color: #60a5fa;
+            border: 1px solid #2563eb44;
+        }
+
+        .svc-tag.acc {
+            background: #059669;
+            color: #fff;
+        }
+
+        .waterfall {
+            display: flex;
+            align-items: center;
+            height: 18px;
+            position: relative;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .wf-bar {
+            height: 100%;
+            border-radius: 3px;
+            position: absolute;
+            min-width: 4px;
+            opacity: 0.85;
+        }
+
+        .wf-bar.ingress {
+            background: linear-gradient(90deg, #7c3aed, #a78bfa);
+        }
+
+        .wf-bar.orchestrator {
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+        }
+
+        .wf-bar.acc {
+            background: linear-gradient(90deg, #059669, #34d399);
+        }
+
+        .wf-bar.error {
+            background: linear-gradient(90deg, #dc2626, #f87171);
+        }
+
+        .trace-duration {
+            font-family: monospace;
+            color: var(--text-muted);
+            text-align: right;
+            font-size: 0.65rem;
+        }
+
+        .trace-status-ok {
+            color: #34d399;
+        }
+
+        .trace-status-err {
+            color: #f87171;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">E</div>
+        <h1>EGAP Command Plane</h1>
+        <div class="nav-pills">
+            <span class="status-pill live"><span class="dot"></span> Live</span>
+            <span class="status-pill discovery" id="discovery-pill"><span class="dot"></span> Discovery: —</span>
+            <button class="deploy-btn" id="deploy-btn" onclick="triggerDeploy()">🚀 Deploy Factory</button>
+        </div>
+    </header>
+
+    <!-- ── Cost Accounting Bar ───────────────────────────── -->
+    <div class="cost-bar" id="cost-bar">
+        <span class="cost-title">💰 Cost Accounting</span>
+        <div class="cost-stat">
+            <span class="value" id="total-tokens">—</span>
+            <span class="unit">tokens</span>
+        </div>
+        <div class="cost-stat">
+            <span class="value" id="total-cost">—</span>
+            <span class="unit">USD</span>
+        </div>
+        <div class="cost-agents" id="cost-agents"></div>
+    </div>
+
+    <div class="split-view">
+        <!-- ── Left Column: Agents ──────────────────────────────── -->
+        <div class="panel panel-left">
+            <div class="panel-header">
+                <span class="panel-title"><span class="icon">🤖</span> Active Workforce</span>
+                <span class="count-badge green" id="agent-count">—</span>
+            </div>
+            <div class="card-grid" id="agent-grid">
+                <div class="state-msg">
+                    <div class="spinner"></div>
+                    <p class="label">Loading agents…</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Right Column: Tasks ──────────────────────────────── -->
+        <div class="panel panel-right">
+            <div class="panel-header">
+                <span class="panel-title"><span class="icon">📋</span> Approval Inbox</span>
+                <span class="count-badge yellow" id="task-count">—</span>
+            </div>
+            <div class="card-grid" id="task-grid">
+                <div class="state-msg">
+                    <div class="spinner yellow"></div>
+                    <p class="label">Loading tasks…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Trace Map ──────────────────────────────── -->
+    <div class="trace-section">
+        <div class="panel-header">
+            <span class="panel-title"><span class="icon">🔍</span> Trace Map</span>
+            <span class="count-badge" id="trace-count" style="background: #7c3aed;">—</span>
+        </div>
+        <div id="trace-list">
+            <div class="state-msg">
+                <div class="spinner"></div>
+                <p class="label">Loading traces…</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Helpers ────────────────────────────────────────────────
+        function esc(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function timeAgo(dateStr) {
+            const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+            if (diff < 5) return 'just now';
+            if (diff < 60) return `${diff}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            return `${Math.floor(diff / 86400)}d ago`;
+        }
+
+        function truncateId(id) {
+            return id.length > 8 ? id.slice(0, 8) + '…' : id;
+        }
+
+        // ── Render Agents ─────────────────────────────────────────
+        async function loadAgents() {
+            const grid = document.getElementById('agent-grid');
+            const badge = document.getElementById('agent-count');
+
+            try {
+                const res = await fetch('/api/agents');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const agents = data.agents || data;
+
+                badge.textContent = agents.length;
+
+                if (agents.length === 0) {
+                    grid.innerHTML = `<div class="state-msg"><div class="icon">🤖</div><p class="label">No agents deployed</p><p class="hint">Use the Agent Wizard to create one.</p></div>`;
+                    return;
+                }
+
+                grid.innerHTML = agents.map(a => `
+          <div class="agent-card">
+            <div class="card-top">
+              <span class="name">${esc(a.name)}</span>
+              <span class="role-badge">${esc(a.role)}</span>
+            </div>
+            <p class="goal">${esc(a.goal)}</p>
+            <div class="tools-row">
+              ${(a.tools || []).map(t => `<span class="tool-chip">${esc(t.name)}</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+
+            } catch (err) {
+                grid.innerHTML = `<div class="state-msg"><div class="icon">⚠️</div><p class="label" style="color:#ff5555">Failed to load agents</p><p class="hint">${esc(err.message)}</p></div>`;
+            }
+        }
+
+        // ── Render Tasks ──────────────────────────────────────────
+        let previousTaskIds = null;
+
+        async function loadTasks() {
+            const grid = document.getElementById('task-grid');
+            const badge = document.getElementById('task-count');
+
+            try {
+                const res = await fetch('/api/tasks');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const tasks = data.tasks || data;
+
+                badge.textContent = tasks.length;
+
+                // Skip re-render if nothing changed (avoids flicker during polling)
+                const currentIds = tasks.map(t => t.id).join(',');
+                if (currentIds === previousTaskIds) return;
+                previousTaskIds = currentIds;
+
+                if (tasks.length === 0) {
+                    grid.innerHTML = `<div class="state-msg"><div class="icon">✅</div><p class="label">No pending tasks</p><p class="hint">Tasks will appear here when webhook signals arrive.</p></div>`;
+                    return;
+                }
+
+                grid.innerHTML = tasks.map(t => {
+                    const isZombie = t.isZombie;
+                    const statusBadge = isZombie
+                        ? `<span class="zombie-badge">⚠️ Stuck</span>`
+                        : `<span class="pending-badge"><span class="blink"></span> Pending</span>`;
+                    return `
+          <div class="task-ticket ${isZombie ? 'zombie' : ''}" id="task-${t.id}">
+            <div class="ticket-top">
+              <span class="task-id">${esc(truncateId(t.id))}</span>
+              ${statusBadge}
+            </div>
+            <p class="description">${esc(t.description)}</p>
+            <div class="agent-ref">
+              <span>↗</span>
+              <span>Agent: <span class="agent-name">${esc(t.agent?.name || 'Unknown')}</span></span>
+            </div>
+            <div class="time-ago">${timeAgo(t.createdAt)}</div>
+            <div class="task-actions">
+              <button class="action-btn approve" onclick="handleTask('${t.id}', 'approve')">✓ Approve</button>
+              <button class="action-btn reject" onclick="handleTask('${t.id}', 'reject')">✕ Reject</button>
+            </div>
+          </div>
+        `}).join('');
+
+            } catch (err) {
+                // Only show error on first load, not during polling
+                if (!previousTaskIds) {
+                    grid.innerHTML = `<div class="state-msg"><div class="icon">⚠️</div><p class="label" style="color:#ff5555">Failed to load tasks</p><p class="hint">${esc(err.message)}</p></div>`;
+                }
+            }
+        }
+
+        // ── Approve / Reject Handler ──────────────────────────────
+        async function handleTask(id, action) {
+            const card = document.getElementById(`task-${id}`);
+            // Disable buttons immediately
+            if (card) {
+                card.querySelectorAll('.action-btn').forEach(b => b.disabled = true);
+            }
+
+            try {
+                const res = await fetch(`/api/tasks/${id}/${action}`, { method: 'POST' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                // Optimistic removal with animation
+                if (card) {
+                    card.style.animation = 'fadeOut 0.3s ease forwards';
+                    setTimeout(() => {
+                        card.remove();
+                        // Update badge count
+                        const remaining = document.querySelectorAll('.task-ticket').length;
+                        document.getElementById('task-count').textContent = remaining;
+                        // Force refresh on next poll
+                        previousTaskIds = null;
+                        if (remaining === 0) {
+                            document.getElementById('task-grid').innerHTML = `<div class="state-msg"><div class="icon">✅</div><p class="label">No pending tasks</p><p class="hint">Tasks will appear here when webhook signals arrive.</p></div>`;
+                        }
+                    }, 300);
+                }
+            } catch (err) {
+                console.error(`Failed to ${action} task:`, err);
+                // Re-enable buttons on error
+                if (card) {
+                    card.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+                }
+            }
+        }
+
+        // ── Load Cost Accounting ──────────────────────────────────
+        async function loadUsage() {
+            try {
+                const res = await fetch('/api/usage');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                document.getElementById('total-tokens').textContent =
+                    data.totalTokens.toLocaleString();
+                document.getElementById('total-cost').textContent =
+                    '$' + data.totalCostUsd.toFixed(4);
+
+                const agentsDiv = document.getElementById('cost-agents');
+                if (data.byAgent && data.byAgent.length > 0) {
+                    agentsDiv.innerHTML = data.byAgent.map(a =>
+                        `<span class="cost-agent-chip">${esc(a.name)}: ${a.totalTokens.toLocaleString()} tkn</span>`
+                    ).join('');
+                } else {
+                    agentsDiv.innerHTML = '<span class="cost-agent-chip">No usage yet</span>';
+                }
+            } catch (err) {
+                // silently fail on cost bar
+            }
+        }
+
+        // ── Trigger Deployment ───────────────────────────────
+        async function triggerDeploy() {
+            const btn = document.getElementById('deploy-btn');
+            const factoryUrl = 'http://localhost:3000';
+            btn.disabled = true;
+            btn.classList.add('deploying');
+            btn.textContent = '⏳ Deploying...';
+            try {
+                const res = await fetch(`${factoryUrl}/api/deploy`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    btn.textContent = '✅ Build Triggered';
+                    setTimeout(() => {
+                        btn.textContent = '🚀 Deploy Factory';
+                        btn.disabled = false;
+                        btn.classList.remove('deploying');
+                    }, 5000);
+                } else {
+                    btn.textContent = '❌ Failed';
+                    setTimeout(() => {
+                        btn.textContent = '🚀 Deploy Factory';
+                        btn.disabled = false;
+                        btn.classList.remove('deploying');
+                    }, 3000);
+                }
+            } catch (err) {
+                btn.textContent = '❌ Factory Offline';
+                setTimeout(() => {
+                    btn.textContent = '🚀 Deploy Factory';
+                    btn.disabled = false;
+                    btn.classList.remove('deploying');
+                }, 3000);
+            }
+        }
+
+        // ── Load Discovery Status ─────────────────────────────
+        async function loadDiscovery() {
+            const pill = document.getElementById('discovery-pill');
+            try {
+                const res = await fetch('/api/discovery');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                pill.classList.remove('error');
+                if (data.error) {
+                    pill.classList.add('error');
+                    pill.innerHTML = `<span class="dot"></span> Discovery: Offline`;
+                } else if (data.lastRun) {
+                    pill.innerHTML = `<span class="dot"></span> Discovery: ${data.agentsSynced.length} synced`;
+                }
+            } catch (err) {
+                pill.classList.add('error');
+                pill.innerHTML = `<span class="dot"></span> Discovery: —`;
+            }
+        }
+
+        // ── Load Traces ───────────────────────────────────────
+        async function loadTraces() {
+            const list = document.getElementById('trace-list');
+            const badge = document.getElementById('trace-count');
+            try {
+                const res = await fetch('/api/traces?limit=10');
+                if (!res.ok) return;
+                const data = await res.json();
+                badge.textContent = data.count;
+
+                if (data.count === 0) {
+                    list.innerHTML = '<p style="color:var(--text-muted);font-size:.75rem;text-align:center;padding:1rem;">No traces yet — send a webhook to start tracing.</p>';
+                    return;
+                }
+
+                list.innerHTML = data.traces.map(t => {
+                    const maxDur = Math.max(...data.traces.map(x => x.totalDurationMs || 1), 1);
+                    const svcTags = t.services.map(s => `<span class="svc-tag ${s}">${s}</span>`).join('');
+
+                    // Build waterfall bars for each span
+                    const rootStart = new Date(t.startedAt).getTime();
+                    const totalMs = t.totalDurationMs || 1;
+                    const bars = t.spans.map(span => {
+                        const spanStart = new Date(span.startedAt).getTime();
+                        const left = Math.max(0, ((spanStart - rootStart) / totalMs) * 100);
+                        const width = Math.max(4, (span.durationMs / totalMs) * 100);
+                        const cls = span.status === 'ERROR' ? 'error' : span.service;
+                        return `<div class="wf-bar ${cls}" style="left:${left}%;width:${width}%" title="${span.operation} (${span.durationMs}ms)"></div>`;
+                    }).join('');
+
+                    const statusCls = t.status === 'ERROR' ? 'trace-status-err' : 'trace-status-ok';
+                    const statusIcon = t.status === 'ERROR' ? '⚠️' : '✓';
+
+                    return `<div class="trace-row">
+                        <span class="trace-id" title="${t.traceId}">${t.traceId.slice(0, 8)}…</span>
+                        <div class="trace-services">${svcTags}</div>
+                        <div class="waterfall">${bars}</div>
+                        <span class="trace-duration ${statusCls}">${statusIcon} ${t.totalDurationMs}ms</span>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                list.innerHTML = '<p style="color:#f87171;font-size:.75rem;text-align:center;padding:1rem;">Failed to load traces.</p>';
+            }
+        }
+
+        // ── Init ──────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAgents();
+            loadTasks();
+            loadUsage();
+            loadDiscovery();
+            loadTraces();
+
+            // Poll tasks every 2 seconds for real-time updates
+            setInterval(loadTasks, 2000);
+            // Poll usage every 5 seconds
+            setInterval(loadUsage, 5000);
+            setInterval(loadDiscovery, 15000);
+            setInterval(loadTraces, 5000);
+        });
+    </script>
+
+</body>
+
+</html>
