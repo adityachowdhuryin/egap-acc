@@ -745,6 +745,110 @@
         .trace-status-err {
             color: #f87171;
         }
+
+        /* ── Reconciliation Report ──────────────────────────────── */
+        .recon-section {
+            margin: 1.5rem 1rem 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.25rem;
+        }
+
+        .recon-section .panel-header {
+            margin-bottom: 1rem;
+        }
+
+        .recon-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .recon-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .recon-card .rc-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            display: block;
+        }
+
+        .recon-card .rc-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            display: block;
+        }
+
+        .recon-progress {
+            position: relative;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        .recon-bar {
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.6s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .recon-bar.resolved {
+            background: linear-gradient(90deg, #059669, #34d399);
+        }
+
+        .recon-bar.pending {
+            background: linear-gradient(90deg, #d97706, #f59e0b);
+        }
+
+        .recon-bar.gap {
+            background: linear-gradient(90deg, #dc2626, #f87171);
+        }
+
+        .recon-status {
+            text-align: center;
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .recon-status.reconciled {
+            background: #05966922;
+            color: #34d399;
+            border: 1px solid #05966944;
+        }
+
+        .recon-status.pending_approval {
+            background: #d9770622;
+            color: #fbbf24;
+            border: 1px solid #d9770644;
+        }
+
+        .recon-status.unreconciled {
+            background: #dc262622;
+            color: #f87171;
+            border: 1px solid #dc262644;
+        }
     </style>
 </head>
 
@@ -816,6 +920,22 @@
                 <p class="label">Loading traces…</p>
             </div>
         </div>
+    </div>
+
+    <!-- ── Reconciliation Report ────────────────────── -->
+    <div class="recon-section">
+        <div class="panel-header">
+            <span class="panel-title"><span class="icon">📊</span> Reconciliation Report</span>
+            <span class="count-badge" id="recon-badge" style="background: #059669;">—</span>
+        </div>
+        <div class="recon-stats" id="recon-stats">
+            <div class="state-msg">
+                <div class="spinner"></div>
+                <p class="label">Loading report…</p>
+            </div>
+        </div>
+        <div class="recon-progress" id="recon-progress"></div>
+        <div id="recon-status"></div>
     </div>
 
     <script>
@@ -1094,6 +1214,53 @@
             }
         }
 
+        // ── Load Reconciliation ───────────────────────────────
+        async function loadReconciliation() {
+            const stats = document.getElementById('recon-stats');
+            const progress = document.getElementById('recon-progress');
+            const statusEl = document.getElementById('recon-status');
+            const badge = document.getElementById('recon-badge');
+            try {
+                const res = await fetch('/api/reconciliation');
+                if (!res.ok) return;
+                const d = await res.json();
+
+                const totalIngress = d.reconciliation.totalIngress || 0;
+                const resolved = d.reconciliation.totalResolved || 0;
+                const pending = d.egress.pending || 0;
+                const gap = d.reconciliation.gap || 0;
+
+                badge.textContent = d.reconciliation.status === 'RECONCILED' ? '✓' : gap;
+
+                stats.innerHTML = `
+                    <div class="recon-card"><span class="rc-value" style="color:#a78bfa">${d.ingress.totalReceived}</span><span class="rc-label">Received</span></div>
+                    <div class="recon-card"><span class="rc-value" style="color:#60a5fa">${d.ingress.totalPublished}</span><span class="rc-label">Published</span></div>
+                    <div class="recon-card"><span class="rc-value" style="color:#fbbf24">${d.egress.totalTasks}</span><span class="rc-label">Tasks Created</span></div>
+                    <div class="recon-card"><span class="rc-value" style="color:#34d399">${d.egress.approved}</span><span class="rc-label">Approved</span></div>
+                    <div class="recon-card"><span class="rc-value" style="color:#f87171">${d.egress.rejected}</span><span class="rc-label">Rejected</span></div>
+                    <div class="recon-card"><span class="rc-value" style="color:#fbbf24">${d.egress.pending}</span><span class="rc-label">Pending</span></div>
+                `;
+
+                // Progress bar
+                const total = Math.max(totalIngress, 1);
+                const resolvedPct = (resolved / total) * 100;
+                const pendingPct = (pending / total) * 100;
+                const gapPct = Math.max(0, ((gap - pending) / total) * 100);
+
+                let bars = `<div class="recon-bar resolved" style="width:${resolvedPct}%">${resolved > 0 ? resolved + ' resolved' : ''}</div>`;
+                if (pending > 0) bars += `<div class="recon-bar pending" style="width:${pendingPct}%">${pending} pending</div>`;
+                if (gapPct > 0) bars += `<div class="recon-bar gap" style="width:${gapPct}%">gap</div>`;
+                progress.innerHTML = bars;
+
+                // Status badge
+                const st = d.reconciliation.status.toLowerCase();
+                const labels = { reconciled: '✅ Fully Reconciled — All ingress messages resolved', pending_approval: '⏳ Pending Approval — Tasks awaiting human review', unreconciled: '⚠️ Unreconciled — Gap detected between ingress and egress' };
+                statusEl.innerHTML = `<div class="recon-status ${st}">${labels[st] || st}</div>`;
+            } catch (err) {
+                stats.innerHTML = '<p style="color:#f87171;font-size:.75rem;text-align:center">Failed to load reconciliation.</p>';
+            }
+        }
+
         // ── Init ──────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
             loadAgents();
@@ -1101,6 +1268,7 @@
             loadUsage();
             loadDiscovery();
             loadTraces();
+            loadReconciliation();
 
             // Poll tasks every 2 seconds for real-time updates
             setInterval(loadTasks, 2000);
@@ -1108,6 +1276,7 @@
             setInterval(loadUsage, 5000);
             setInterval(loadDiscovery, 15000);
             setInterval(loadTraces, 5000);
+            setInterval(loadReconciliation, 5000);
         });
     </script>
 

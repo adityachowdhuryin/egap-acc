@@ -299,6 +299,68 @@ server.get('/api/traces', async (request) => {
   return { count: traces.length, traces };
 });
 
+// ── Phase 5: Final Reconciliation ────────────────────────────────────
+const INGRESS_URL = process.env.INGRESS_URL || 'http://localhost:8080';
+
+// 9. Reconciliation Report — compare ingress vs egress
+server.get('/api/reconciliation', async () => {
+  // 1. Query task statuses from our DB
+  const allTasks = await prisma.task.findMany({
+    include: { agent: { select: { name: true } } },
+  });
+
+  const approved = allTasks.filter(t => t.status === 'APPROVED');
+  const rejected = allTasks.filter(t => t.status === 'REJECTED');
+  const pending = allTasks.filter(t => t.status === 'PENDING');
+
+  // 2. Query trace spans for ingress events (proxy for messages received)
+  const ingressSpans = await prisma.traceSpan.findMany({
+    where: { service: 'ingress', operation: 'webhook_receive' },
+  });
+
+  // 3. Try to fetch live ingress audit counters
+  let ingressStats = { totalReceived: 0, totalPublished: 0, totalFailed: 0, uptime: 'N/A' };
+  try {
+    const res = await fetch(`${INGRESS_URL}/api/stats`);
+    if (res.ok) ingressStats = await res.json() as typeof ingressStats;
+  } catch { /* ingress offline — use span count as fallback */ }
+
+  const totalIngress = ingressStats.totalReceived || ingressSpans.length;
+  const totalResolved = approved.length + rejected.length;
+  const gap = totalIngress - totalResolved;
+
+  // 4. Get cost totals
+  const usageLogs = await prisma.usageLog.findMany();
+  const totalTokens = usageLogs.reduce((s, l) => s + l.tokens, 0);
+  const totalCost = Math.round(usageLogs.reduce((s, l) => s + l.costUsd, 0) * 10000) / 10000;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    ingress: {
+      totalReceived: totalIngress,
+      totalPublished: ingressStats.totalPublished || ingressSpans.length,
+      totalFailed: ingressStats.totalFailed,
+      liveStats: ingressStats,
+    },
+    egress: {
+      totalTasks: allTasks.length,
+      approved: approved.length,
+      rejected: rejected.length,
+      pending: pending.length,
+    },
+    reconciliation: {
+      totalIngress,
+      totalResolved,
+      gap,
+      status: gap === 0 ? 'RECONCILED' : pending.length > 0 ? 'PENDING_APPROVAL' : 'UNRECONCILED',
+    },
+    cost: {
+      totalTokens,
+      totalCostUsd: totalCost,
+    },
+  };
+});
+
 const start = async () => {
   try {
     // Run on port 3001 so it doesn't conflict with other things
